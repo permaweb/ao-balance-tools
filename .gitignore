@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.log
+.env
+.env.local
+coverage/
+*.tsbuildinfo
+.DS_Store
+*.csv
+*.json.output
+demo.json

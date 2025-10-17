@@ -1,5 +1,6 @@
 import { config as loadEnv } from 'dotenv';
 import { Config } from './types';
+import * as fs from 'fs';
 
 loadEnv();
 
@@ -24,6 +25,33 @@ export function getConfig(): Config {
     cuUrlB: process.env.CU_URL_B || 'https://cu.ao-testnet.xyz',
     walletPath: process.env.WALLET_PATH || './demo.json',
   };
+}
+
+export function validateWalletPath(walletPath: string): void {
+  if (!walletPath || walletPath.trim().length === 0) {
+    throw new Error('Wallet path cannot be empty');
+  }
+
+  if (!fs.existsSync(walletPath)) {
+    throw new Error(`Wallet file not found: ${walletPath}`);
+  }
+
+  try {
+    const walletData = fs.readFileSync(walletPath, 'utf-8');
+    const wallet = JSON.parse(walletData);
+    
+    if (!wallet.kty || !wallet.n || !wallet.e) {
+      throw new Error('Invalid JWK format: missing required fields (kty, n, e)');
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes('Invalid JWK')) {
+        throw error;
+      }
+      throw new Error(`Invalid wallet file format: ${error.message}`);
+    }
+    throw new Error('Invalid wallet file format: Unknown error');
+  }
 }
 
 export function validateConfig(config: Config): void {

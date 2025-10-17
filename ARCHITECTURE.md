@@ -13,10 +13,18 @@ Balance Checker CLI is designed as a modular, production-ready TypeScript applic
        │
        ├─→ Config Loader (config.ts)
        │
-       ├─→ Balance Processor (processor.ts)
-       │   ├─→ AO Client (aoClient.ts)
-       │   ├─→ Hyperbeam Client (hyperbeam.ts)
-       │   └─→ Comparator (comparator.ts)
+       ├─→ Mode Router
+       │   ├─→ Dryrun Path
+       │   │   └─→ Balance Processor (processor.ts)
+       │   │       ├─→ AO Client (aoClient.ts)
+       │   │       ├─→ Hyperbeam Client (hyperbeam.ts)
+       │   │       └─→ Comparator (comparator.ts)
+       │   │
+       │   └─→ Wallet Path (NEW)
+       │       └─→ Wallet Balance Processor (walletProcessor.ts)
+       │           ├─→ CU Client (cuClient.ts)
+       │           ├─→ Hyperbeam Client (hyperbeam.ts)
+       │           └─→ Comparator (comparator.ts)
        │
        └─→ Reporter (reporter.ts)
 ```
@@ -29,15 +37,19 @@ Balance Checker CLI is designed as a modular, production-ready TypeScript applic
 
 **Key Features**:
 - Argument parsing using Commander.js
+- Mode selection (dryrun or wallet)
 - Option validation
 - Error presentation
 - Exit code management
+- Mode-based processor routing
 
 **Design Decisions**:
 - Single responsibility: only handles CLI concerns
 - Delegates all business logic to other modules
 - Provides clear, actionable error messages
 - Supports multiple output formats
+- Routes to appropriate processor based on mode
+- Validates wallet path for wallet mode
 
 ### 2. Configuration (`config.ts`)
 
@@ -48,12 +60,16 @@ Balance Checker CLI is designed as a modular, production-ready TypeScript applic
 - Provides sensible defaults
 - Validates configuration values
 - Type-safe configuration object
+- Validates wallet file path and JWK format
+- Supports WALLET_PATH environment variable
 
 **Design Decisions**:
 - Fail-fast validation for required variables
 - Range checking for numeric values
 - Immutable configuration after load
 - Clear error messages for misconfiguration
+- Separate `validateWalletPath()` function for wallet validation
+- Validates JWK format (kty, n, e fields required)
 
 ### 3. Type Definitions (`types.ts`)
 
@@ -63,12 +79,15 @@ Balance Checker CLI is designed as a modular, production-ready TypeScript applic
 - Interface definitions for all data structures
 - Type guards for runtime validation
 - Clear documentation through types
+- Mode type union (`'dryrun' | 'wallet'`)
+- Extended CLIOptions interface
 
 **Design Decisions**:
 - Separate file for easy reference
 - Comprehensive type coverage
 - Explicit over implicit types
 - Support for future extensibility
+- Mode and wallet options added to CLIOptions
 
 ### 4. AO Client (`aoClient.ts`)
 
@@ -172,7 +191,40 @@ maxDelay = min(calculatedDelay, 30000ms)
 6. Return comparison array
 ```
 
-### 8. Reporter (`reporter.ts`)
+### 8. Wallet Balance Processor (`walletProcessor.ts`) - NEW
+
+**Responsibility**: Orchestrates wallet-authenticated balance checking
+
+**Key Features**:
+- Wallet loading and validation
+- Authenticated message sending
+- Result retrieval from CU
+- Concurrent balance comparison
+- Progress tracking
+- Error handling
+
+**Design Decisions**:
+- **Parallel Structure**: Mirrors BalanceProcessor for consistency
+- **Reuse**: Uses same CUClient, HyperbeamClient, Comparator, Reporter
+- **Separation**: Keeps wallet-specific logic isolated
+- **Backward Compatibility**: Doesn't affect existing dryrun mode
+- **Error Handling**: Same patterns as BalanceProcessor
+
+**Processing Flow**:
+```
+1. Load wallet from file
+2. Send authenticated message (Action="Balances")
+3. Retrieve result from CU
+4. Extract addresses from balances
+5. Create promise pool for concurrency
+6. For each address concurrently:
+   a. Fetch from Hyperbeam
+   b. Compare balances
+   c. Update progress
+7. Aggregate results and return
+```
+
+### 9. Reporter (`reporter.ts`)
 
 **Responsibility**: Multi-format report generation
 
@@ -190,6 +242,7 @@ maxDelay = min(calculatedDelay, 30000ms)
 
 ## Data Flow
 
+### Dryrun Mode (Default)
 ```
 1. User Input (CLI)
    ↓
@@ -197,7 +250,7 @@ maxDelay = min(calculatedDelay, 30000ms)
    ↓
 3. Process ID Validation
    ↓
-4. AO Balance Fetch (Single API Call)
+4. AO Balance Fetch via Dryrun (Single Unauthenticated Call)
    ↓
 5. Concurrent Hyperbeam Fetches
    │
@@ -211,6 +264,62 @@ maxDelay = min(calculatedDelay, 30000ms)
 7. Generate Report
    ↓
 8. Output (Console/File)
+```
+
+### Wallet Mode (New)
+```
+1. User Input (CLI with --mode wallet --wallet <path>)
+   ↓
+2. Configuration Loading
+   ↓
+3. Wallet Path Validation & JWK Format Check
+   ↓
+4. Process ID Validation
+   ↓
+5. Wallet Loading from File
+   ↓
+6. Authenticated Message Sending (Action="Balances")
+   ↓
+7. Result Retrieval from CU
+   ↓
+8. Concurrent Hyperbeam Fetches (Same as Dryrun)
+   │
+   ├→ Address 1 → Compare → Store
+   ├→ Address 2 → Compare → Store
+   ├→ Address 3 → Compare → Store
+   └→ Address N → Compare → Store
+   ↓
+9. Aggregate Results
+   ↓
+10. Generate Report
+   ↓
+11. Output (Console/File)
+```
+
+## Project Structure
+
+```
+balance-checker/
+├── src/
+│   ├── cli.ts              # balance-checker CLI entry point
+│   ├── cu-compare.ts       # cu-compare CLI entry point
+│   ├── config.ts           # Configuration management
+│   ├── types.ts            # TypeScript type definitions
+│   ├── aoClient.ts         # AO process interaction (dryrun)
+│   ├── cuClient.ts         # CU client (message/result)
+│   ├── hyperbeam.ts        # Hyperbeam API client
+│   ├── comparator.ts       # Balance comparison logic
+│   ├── cuComparator.ts     # CU comparison logic
+│   ├── processor.ts        # Concurrent processing (dryrun mode)
+│   ├── walletProcessor.ts  # Concurrent processing (wallet mode) - NEW
+│   └── reporter.ts         # Multi-format report generation
+├── tests/
+│   ├── walletProcessor.test.ts
+│   ├── config.test.ts
+│   └── cli.test.ts
+├── .env.example            # Environment variable template
+├── package.json
+└── README.md
 ```
 
 ## Performance Optimizations
@@ -344,6 +453,12 @@ Exit with Code 1
 3. **URL Validation**: Ensure valid HTTP/HTTPS URLs
 4. **Rate Limiting**: Respect API limits to avoid bans
 5. **Error Messages**: Don't expose sensitive information
+6. **Wallet Security (Wallet Mode)**:
+   - Wallet data never logged or exposed in error messages
+   - Wallet file existence and permission checking
+   - JWK format validation before use
+   - Wallet path passed through CLI or environment only
+   - Add wallet files to .gitignore (CRITICAL - security risk if committed)
 
 ## Future Enhancements
 
@@ -353,6 +468,10 @@ Exit with Code 1
 2. **Resume**: Save progress and resume after interruption
 3. **Filtering**: Filter by balance threshold
 4. **Watch Mode**: Continuous monitoring
+5. **Wallet Improvements**:
+   - Support encrypted wallet files with passphrase
+   - Automatic wallet mode detection if --wallet provided
+   - Multiple wallets rotation to avoid rate limits
 
 ### Long-term (v2.0+)
 
@@ -362,6 +481,7 @@ Exit with Code 1
 4. **Web Dashboard**: Visualize discrepancies
 5. **Webhooks**: Alert on mismatches
 6. **Multi-Process**: Compare multiple AO processes
+7. **Hybrid Mode**: Compare dryrun vs wallet vs Hyperbeam (three-way validation)
 
 ## Dependencies
 

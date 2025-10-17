@@ -54,12 +54,16 @@ export interface BalanceFetchResult {
 
 export type OutputFormat = 'console' | 'json' | 'csv';
 
+export type Mode = 'dryrun' | 'wallet';
+
 export interface CLIOptions {
   processId: string;
   output?: OutputFormat;
   outputFile?: string;
   concurrency?: number;
   verbose?: boolean;
+  mode?: Mode;
+  wallet?: string;
 }
 
 export interface CUComparisonResult {

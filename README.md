@@ -64,16 +64,21 @@ Create a `.env` file in the project root:
 # Required
 CU_URL=https://cu.ao-testnet.xyz
 
-# Optional
+# Optional - Hyperbeam and Performance
 HYPERBEAM_BASE_URL=https://compute.hyperbeam.xyz
 CONCURRENCY=15
 RETRY_ATTEMPTS=3
 RETRY_DELAY_MS=1000
 TIMEOUT=30000
 MAX_ADDRESSES=10
+
+# Wallet Mode (optional - can be passed via --wallet flag)
+WALLET_PATH=./demo.json
 ```
 
 ### Usage Examples
+
+#### Dryrun Mode (Default)
 
 ```bash
 # Basic console output
@@ -92,6 +97,27 @@ balance-checker xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs -c 20
 balance-checker xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs -v --no-progress
 ```
 
+#### Wallet Mode (New)
+
+Validates balances by sending an authenticated message with a wallet and comparing the result against Hyperbeam:
+
+```bash
+# Basic wallet mode with console output
+balance-checker --mode wallet --wallet demo.json xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs
+
+# Short form
+balance-checker -m wallet -w demo.json xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs
+
+# Export to JSON
+balance-checker -m wallet -w demo.json xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs -o json -f wallet-report.json
+
+# Using WALLET_PATH environment variable
+WALLET_PATH=demo.json balance-checker --mode wallet xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs
+
+# Verbose output with custom concurrency
+balance-checker -m wallet -w demo.json xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs -v -c 20
+```
+
 ### CLI Options
 
 ```
@@ -102,6 +128,8 @@ Arguments:
 
 Options:
   -V, --version                 output the version number
+  -m, --mode <type>             Balance fetch mode: dryrun or wallet (default: "dryrun")
+  -w, --wallet <path>           Path to wallet file (required for wallet mode)
   -o, --output <format>         Output format: console, json, or csv (default: "console")
   -f, --file <path>             Output file path (for json/csv formats)
   -c, --concurrency <number>    Number of concurrent requests (default: "15")
@@ -109,6 +137,19 @@ Options:
   -v, --verbose                 Enable verbose output
   -h, --help                    display help for command
 ```
+
+### Modes
+
+**Dryrun Mode (Default)**
+- Uses `dryrun()` from @permaweb/aoconnect (unauthenticated)
+- Faster, simpler, no wallet required
+- Good for quick validations
+
+**Wallet Mode**
+- Sends authenticated message with Action="Balances" to AO process
+- Uses Arweave wallet for signing (JWK format)
+- Mirrors how cu-compare works
+- Better for production systems requiring audit trails
 
 ### Sample Output
 

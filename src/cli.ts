@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { getConfig, validateConfig } from './config';
+import { getConfig, validateConfig, validateWalletPath } from './config';
 import { BalanceProcessor } from './processor';
+import { WalletBalanceProcessor } from './walletProcessor';
 import { BalanceComparator } from './comparator';
 import { Reporter } from './reporter';
-import { OutputFormat } from './types';
+import { OutputFormat, Mode } from './types';
 
 const program = new Command();
 
@@ -14,6 +15,8 @@ program
   .description('CLI tool to validate AO process balances against Hyperbeam API')
   .version('1.0.0')
   .argument('<process-id>', 'AO process ID to check balances for')
+  .option('-m, --mode <type>', 'Balance fetch mode: dryrun or wallet', 'dryrun')
+  .option('-w, --wallet <path>', 'Path to wallet file (required for wallet mode)')
   .option('-o, --output <format>', 'Output format: console, json, or csv', 'console')
   .option('-f, --file <path>', 'Output file path (for json/csv formats)')
   .option('-c, --concurrency <number>', 'Number of concurrent requests', '15')
@@ -35,9 +38,36 @@ program
 
       validateConfig(config);
 
+      const mode = (options.mode || 'dryrun').toLowerCase() as Mode;
+      
+      if (!['dryrun', 'wallet'].includes(mode)) {
+        reporter.printError(
+          new Error(`Invalid mode: ${options.mode}. Must be 'dryrun' or 'wallet'.`)
+        );
+        process.exit(1);
+      }
+
+      if (mode === 'wallet' && !options.wallet) {
+        if (!process.env.WALLET_PATH) {
+          reporter.printError(
+            new Error('--wallet option required for wallet mode (or set WALLET_PATH environment variable)')
+          );
+          process.exit(1);
+        }
+        options.wallet = process.env.WALLET_PATH;
+      }
+
+      if (mode === 'wallet' && options.wallet) {
+        if (options.verbose) {
+          reporter.printInfo(`Validating wallet file: ${options.wallet}`);
+        }
+        validateWalletPath(options.wallet);
+      }
+
       if (options.verbose) {
         reporter.printInfo(`Using CU_URL: ${config.cuUrl}`);
         reporter.printInfo(`Using Hyperbeam: ${config.hyperbeamBaseUrl}`);
+        reporter.printInfo(`Mode: ${mode}`);
         reporter.printInfo(`Concurrency: ${config.concurrency}`);
       }
 
@@ -58,7 +88,14 @@ program
         reporter.printInfo(`Processing balances for process: ${processId}`);
       }
 
-      const processor = new BalanceProcessor(config);
+      let processor: BalanceProcessor | WalletBalanceProcessor;
+      
+      if (mode === 'wallet') {
+        processor = new WalletBalanceProcessor(config, options.wallet);
+      } else {
+        processor = new BalanceProcessor(config);
+      }
+
       const comparisons = await processor.validateAndProcess(
         processId,
         options.progress

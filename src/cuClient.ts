@@ -1,4 +1,4 @@
-import { message, result, createDataItemSigner } from '@permaweb/aoconnect';
+import { connect, createDataItemSigner } from '@permaweb/aoconnect';
 import * as fs from 'fs';
 import { Config, JWK, CUBalanceResponse } from './types';
 
@@ -35,6 +35,8 @@ export class CUClient {
 
   async sendBalanceMessage(processId: string, wallet: JWK): Promise<string> {
     try {
+      const { message } = connect();
+      
       const messageId = await message({
         process: processId,
         tags: [
@@ -64,6 +66,8 @@ export class CUClient {
     retryCount: number = 0
   ): Promise<CUBalanceResponse> {
     try {
+      const { result } = connect({ CU_URL: cuUrl });
+      
       const cuResult = await result({
         message: messageId,
         process: processId,

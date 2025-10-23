@@ -118,6 +118,27 @@ WALLET_PATH=demo.json balance-checker --mode wallet xU9zFkq3X2ZQ6olwNVvr1vUWIjc3
 balance-checker -m wallet -w demo.json xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs -v -c 20
 ```
 
+#### Manual Mode
+
+Validates balances by fetching the result of a specific message ID (no new message sent):
+
+```bash
+# Basic manual mode with console output
+balance-checker --mode manual --message-id UZ0D49e04Xdzqz_Bg4XWQlifxlTAKDtkr3Uiwm_2VMc xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs
+
+# Short form
+balance-checker -m manual --message-id UZ0D49e04Xdzqz_Bg4XWQlifxlTAKDtkr3Uiwm_2VMc xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs
+
+# Export to JSON
+balance-checker -m manual --message-id UZ0D49e04Xdzqz_Bg4XWQlifxlTAKDtkr3Uiwm_2VMc xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs -o json -f manual-report.json
+
+# Export to CSV
+balance-checker -m manual --message-id UZ0D49e04Xdzqz_Bg4XWQlifxlTAKDtkr3Uiwm_2VMc xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs -o csv -f manual-report.csv
+
+# Verbose output with custom concurrency
+balance-checker -m manual --message-id UZ0D49e04Xdzqz_Bg4XWQlifxlTAKDtkr3Uiwm_2VMc xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs -v -c 20
+```
+
 ### CLI Options
 
 ```
@@ -128,8 +149,9 @@ Arguments:
 
 Options:
   -V, --version                 output the version number
-  -m, --mode <type>             Balance fetch mode: dryrun or wallet (default: "dryrun")
+  -m, --mode <type>             Balance fetch mode: dryrun, wallet, or manual (default: "dryrun")
   -w, --wallet <path>           Path to wallet file (required for wallet mode)
+  --message-id <id>             Message ID to fetch balances from (required for manual mode)
   -o, --output <format>         Output format: console, json, or csv (default: "console")
   -f, --file <path>             Output file path (for json/csv formats)
   -c, --concurrency <number>    Number of concurrent requests (default: "15")
@@ -150,6 +172,12 @@ Options:
 - Uses Arweave wallet for signing (JWK format)
 - Mirrors how cu-compare works
 - Better for production systems requiring audit trails
+
+**Manual Mode**
+- Fetches balance data from a specific pre-existing message ID
+- No new messages sent to AO process
+- Useful for auditing historical balance states
+- Good for validating specific message results and debugging discrepancies
 
 ### Sample Output
 
@@ -290,8 +318,15 @@ balance-checker/
 │   ├── hyperbeam.ts        # Hyperbeam API client
 │   ├── comparator.ts       # Balance comparison logic
 │   ├── cuComparator.ts     # CU comparison logic
-│   ├── processor.ts        # Concurrent processing orchestration
+│   ├── processor.ts        # Concurrent processing orchestration (dryrun mode)
+│   ├── walletProcessor.ts  # Wallet mode processor
+│   ├── manualProcessor.ts  # Manual mode processor
 │   └── reporter.ts         # Multi-format report generation
+├── tests/
+│   ├── cli.test.ts
+│   ├── config.test.ts
+│   ├── walletProcessor.test.ts
+│   └── manualProcessor.test.ts
 ├── .env.example            # Environment variable template
 ├── package.json
 └── README.md

@@ -125,6 +125,19 @@ export class CUClient {
     return validChars.test(processId);
   }
 
+  validateMessageId(messageId: string): boolean {
+    if (!messageId || messageId.trim().length === 0) {
+      return false;
+    }
+
+    if (messageId.length !== 43) {
+      return false;
+    }
+
+    const validChars = /^[a-zA-Z0-9_-]+$/;
+    return validChars.test(messageId);
+  }
+
   private calculateDelay(attempt: number): number {
     const baseDelay = this.config.retryDelayMs;
     const exponentialDelay = baseDelay * Math.pow(2, attempt);

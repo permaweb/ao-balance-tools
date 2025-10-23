@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { getConfig, validateConfig, validateWalletPath } from './config';
 import { BalanceProcessor } from './processor';
 import { WalletBalanceProcessor } from './walletProcessor';
+import { ManualModeProcessor } from './manualProcessor';
 import { BalanceComparator } from './comparator';
 import { Reporter } from './reporter';
 import { OutputFormat, Mode } from './types';
@@ -15,8 +16,9 @@ program
   .description('CLI tool to validate AO process balances against Hyperbeam API')
   .version('1.0.0')
   .argument('<process-id>', 'AO process ID to check balances for')
-  .option('-m, --mode <type>', 'Balance fetch mode: dryrun or wallet', 'dryrun')
+  .option('-m, --mode <type>', 'Balance fetch mode: dryrun, wallet, or manual', 'dryrun')
   .option('-w, --wallet <path>', 'Path to wallet file (required for wallet mode)')
+  .option('--message-id <id>', 'Message ID to fetch balances from (required for manual mode)')
   .option('-o, --output <format>', 'Output format: console, json, or csv', 'console')
   .option('-f, --file <path>', 'Output file path (for json/csv formats)')
   .option('-c, --concurrency <number>', 'Number of concurrent requests', '15')
@@ -40,9 +42,9 @@ program
 
       const mode = (options.mode || 'dryrun').toLowerCase() as Mode;
       
-      if (!['dryrun', 'wallet'].includes(mode)) {
+      if (!['dryrun', 'wallet', 'manual'].includes(mode)) {
         reporter.printError(
-          new Error(`Invalid mode: ${options.mode}. Must be 'dryrun' or 'wallet'.`)
+          new Error(`Invalid mode: ${options.mode}. Must be 'dryrun', 'wallet', or 'manual'.`)
         );
         process.exit(1);
       }
@@ -64,10 +66,20 @@ program
         validateWalletPath(options.wallet);
       }
 
+      if (mode === 'manual' && !options.messageId) {
+        reporter.printError(
+          new Error('--message-id option required for manual mode')
+        );
+        process.exit(1);
+      }
+
       if (options.verbose) {
         reporter.printInfo(`Using CU_URL: ${config.cuUrl}`);
         reporter.printInfo(`Using Hyperbeam: ${config.hyperbeamBaseUrl}`);
         reporter.printInfo(`Mode: ${mode}`);
+        if (mode === 'manual' && options.messageId) {
+          reporter.printInfo(`Message ID: ${options.messageId}`);
+        }
         reporter.printInfo(`Concurrency: ${config.concurrency}`);
       }
 
@@ -88,18 +100,28 @@ program
         reporter.printInfo(`Processing balances for process: ${processId}`);
       }
 
-      let processor: BalanceProcessor | WalletBalanceProcessor;
+      let comparisons;
       
-      if (mode === 'wallet') {
-        processor = new WalletBalanceProcessor(config, options.wallet);
+      if (mode === 'manual') {
+        const processor = new ManualModeProcessor(config);
+        comparisons = await processor.validateAndProcess(
+          processId,
+          options.messageId,
+          options.progress
+        );
+      } else if (mode === 'wallet') {
+        const processor = new WalletBalanceProcessor(config, options.wallet);
+        comparisons = await processor.validateAndProcess(
+          processId,
+          options.progress
+        );
       } else {
-        processor = new BalanceProcessor(config);
+        const processor = new BalanceProcessor(config);
+        comparisons = await processor.validateAndProcess(
+          processId,
+          options.progress
+        );
       }
-
-      const comparisons = await processor.validateAndProcess(
-        processId,
-        options.progress
-      );
 
       if (comparisons.length === 0) {
         reporter.printWarning('No balances found for this process.');

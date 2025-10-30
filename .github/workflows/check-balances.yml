@@ -97,7 +97,7 @@ jobs:
          if: always()
          run: |
            echo "## Balance Check Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+           echo "" >> $GITHUB_STEP_SUMMARY
            echo "### Execution Status" >> $GITHUB_STEP_SUMMARY
            
            if [ -f check_results.txt ]; then

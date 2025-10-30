@@ -113,11 +113,11 @@ jobs:
           # Parse JSON reports and extract summary data
           for report_file in balance-report-*.json; do
             if [ -f "$report_file" ]; then
-              # Extract key metrics from JSON
-              total_addresses=$(jq -r '.summary.total_addresses // .data.total_addresses // "N/A"' "$report_file" 2>/dev/null)
-              matching=$(jq -r '.summary.matching // .data.matching // "N/A"' "$report_file" 2>/dev/null)
-              mismatching=$(jq -r '.summary.mismatching // .data.mismatching // "N/A"' "$report_file" 2>/dev/null)
-              accuracy=$(jq -r '.summary.accuracy // .data.accuracy // "N/A"' "$report_file" 2>/dev/null)
+              # Extract key metrics from JSON (top-level fields)
+              total_addresses=$(jq -r '.totalAddresses // "N/A"' "$report_file" 2>/dev/null)
+              matching=$(jq -r '.matchingCount // "N/A"' "$report_file" 2>/dev/null)
+              mismatching=$(jq -r '.mismatchCount // "N/A"' "$report_file" 2>/dev/null)
+              accuracy=$(jq -r '.accuracyPercentage // "N/A"' "$report_file" 2>/dev/null)
 
               # Extract process ID from filename
               process_id=$(basename "$report_file" .json | sed 's/balance-report-//')
@@ -126,7 +126,11 @@ jobs:
               echo "- Total Addresses: $total_addresses" >> $GITHUB_STEP_SUMMARY
               echo "- Matching: $matching" >> $GITHUB_STEP_SUMMARY
               echo "- Mismatching: $mismatching" >> $GITHUB_STEP_SUMMARY
-              echo "- Accuracy: $accuracy%" >> $GITHUB_STEP_SUMMARY
+              if [ "$accuracy" != "N/A" ]; then
+                echo "- Accuracy: ${accuracy}%" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- Accuracy: N/A" >> $GITHUB_STEP_SUMMARY
+              fi
               echo "" >> $GITHUB_STEP_SUMMARY
             fi
           done

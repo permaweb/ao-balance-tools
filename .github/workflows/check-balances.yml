@@ -1,0 +1,116 @@
+name: Check Process Balances
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+
+jobs:
+  check-balances:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Build project
+        run: npm run build
+      
+      # Create wallet file from base64-encoded secret
+      - name: Create wallet file
+        run: echo '${{ secrets.WALLET_JSON }}' | base64 -d > wallet.json
+      
+      # Set up environment variables
+      - name: Set environment variables
+        run: |
+          cat >> $GITHUB_ENV << EOF
+          CU_URL=https://cu.ao-testnet.xyz
+          WALLET_PATH=wallet.json
+          HYPERBEAM_BASE_URL=${{ secrets.HYPERBEAM_BASE_URL || 'https://compute.hyperbeam.xyz' }}
+          CONCURRENCY=${{ vars.CONCURRENCY || '15' }}
+          RETRY_ATTEMPTS=${{ vars.RETRY_ATTEMPTS || '3' }}
+          EOF
+      
+      # Read processes from processes.txt and check each one
+      - name: Check process balances
+        run: |
+          # Create a temporary file to store results summary
+          > check_results.txt
+          
+          # Read processes.txt and process each line
+          while IFS= read -r line || [[ -n "$line" ]]; do
+            # Skip empty lines and comments
+            [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+            
+            # Trim whitespace
+            process_id=$(echo "$line" | xargs)
+            
+            # Skip if empty after trimming
+            [[ -z "$process_id" ]] && continue
+            
+            echo "Checking balance for process: $process_id"
+            
+            # Generate safe filename from process ID
+            safe_name=$(echo "$process_id" | cut -c1-8)
+            report_file="balance-report-${safe_name}.json"
+            
+            # Run the balance checker
+            if node dist/cli.js \
+              --mode wallet \
+              --wallet wallet.json \
+              --output json \
+              --file "$report_file" \
+              "$process_id"; then
+              echo "✓ $process_id: SUCCESS" >> check_results.txt
+            else
+              echo "✗ $process_id: FAILED" >> check_results.txt
+            fi
+          done < processes.txt
+          
+          echo ""
+          echo "=== Check Results ==="
+          cat check_results.txt || echo "No processes checked"
+        continue-on-error: true
+      
+      # Upload reports as artifacts
+      - name: Upload balance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: balance-reports-${{ github.run_number }}
+          path: balance-report-*.json
+          retention-days: 30
+      
+      # Create a summary report
+      - name: Create summary
+        if: always()
+        run: |
+          echo "## Balance Check Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Summary" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f check_results.txt ]; then
+            cat check_results.txt >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No processes in processes.txt" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "[Download reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+      
+      # Clean up wallet file
+      - name: Clean up wallet file
+        if: always()
+        run: rm -f wallet.json check_results.txt

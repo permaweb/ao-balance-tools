@@ -76,6 +76,8 @@ MAX_ADDRESSES=10
 WALLET_PATH=./demo.json
 ```
 
+**Note:** The `HYPERBEAM_BASE_URL` can be overridden at runtime using the `--hyperbeam` CLI option, which is useful for processes with balances on specific Hyperbeam instances:
+
 ### Usage Examples
 
 #### Dryrun Mode (Default)
@@ -95,6 +97,12 @@ balance-checker xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs -c 20
 
 # Verbose mode with progress disabled
 balance-checker xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs -v --no-progress
+
+# Custom Hyperbeam endpoint (for processes on specific state servers)
+balance-checker --hyperbeam https://state-1.forward.computer xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs
+
+# Combine custom Hyperbeam with other options
+balance-checker --hyperbeam https://state-1.forward.computer xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQB6gdJs -o json -f report.json
 ```
 
 #### Wallet Mode (New)
@@ -152,6 +160,7 @@ Options:
   -m, --mode <type>             Balance fetch mode: dryrun, wallet, or manual (default: "dryrun")
   -w, --wallet <path>           Path to wallet file (required for wallet mode)
   --message-id <id>             Message ID to fetch balances from (required for manual mode)
+  --hyperbeam <url>             Custom Hyperbeam endpoint URL (overrides HYPERBEAM_BASE_URL env var)
   -o, --output <format>         Output format: console, json, or csv (default: "console")
   -f, --file <path>             Output file path (for json/csv formats)
   -c, --concurrency <number>    Number of concurrent requests (default: "15")

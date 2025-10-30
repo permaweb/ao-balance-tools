@@ -19,6 +19,7 @@ program
   .option('-m, --mode <type>', 'Balance fetch mode: dryrun, wallet, or manual', 'dryrun')
   .option('-w, --wallet <path>', 'Path to wallet file (required for wallet mode)')
   .option('--message-id <id>', 'Message ID to fetch balances from (required for manual mode)')
+  .option('--hyperbeam <url>', 'Custom Hyperbeam endpoint URL (default: from env or https://compute.hyperbeam.xyz)')
   .option('-o, --output <format>', 'Output format: console, json, or csv', 'console')
   .option('-f, --file <path>', 'Output file path (for json/csv formats)')
   .option('-c, --concurrency <number>', 'Number of concurrent requests', '15')
@@ -36,6 +37,10 @@ program
       
       if (options.concurrency) {
         config.concurrency = parseInt(options.concurrency, 10);
+      }
+
+      if (options.hyperbeam) {
+        config.hyperbeamBaseUrl = options.hyperbeam;
       }
 
       validateConfig(config);

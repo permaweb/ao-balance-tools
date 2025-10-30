@@ -33,7 +33,7 @@ export class CUClient {
     }
   }
 
-  async sendBalanceMessage(processId: string, wallet: JWK): Promise<string> {
+  async sendBalanceMessage(processId: string, wallet: JWK, retryCount: number = 0): Promise<string> {
     try {
       const { message } = connect();
       
@@ -52,6 +52,17 @@ export class CUClient {
 
       return messageId;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Handle rate limiting with retry
+      if (retryCount < this.config.retryAttempts && 
+          (errorMessage.includes('Rate limit') || errorMessage.includes('429'))) {
+        const delay = this.calculateDelay(retryCount);
+        console.log(`Rate limited. Retrying after ${delay}ms (attempt ${retryCount + 1}/${this.config.retryAttempts})...`);
+        await this.sleep(delay);
+        return this.sendBalanceMessage(processId, wallet, retryCount + 1);
+      }
+
       if (error instanceof Error) {
         throw new Error(`Failed to send balance message: ${error.message}`);
       }

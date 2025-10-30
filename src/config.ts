@@ -63,8 +63,8 @@ export function validateConfig(config: Config): void {
     throw new Error('Concurrency must be between 1 and 100');
   }
 
-  if (config.retryAttempts < 0 || config.retryAttempts > 10) {
-    throw new Error('Retry attempts must be between 0 and 10');
+  if (config.retryAttempts < 0 || config.retryAttempts > 30) {
+    throw new Error('Retry attempts must be between 0 and 30');
   }
 
   if (config.timeout < 1000) {

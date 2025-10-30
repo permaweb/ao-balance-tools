@@ -2,18 +2,24 @@ import { dryrun } from '@permaweb/aoconnect';
 import { Config, AOBalanceResponse } from './types';
 
 export class AOClient {
-  constructor(_config: Config) {
+  private config: Config;
+
+  constructor(config: Config) {
+    this.config = config;
   }
 
   async getBalances(processId: string): Promise<AOBalanceResponse> {
     try {
-      const result = await dryrun({
-        process: processId,
-        data: '',
-        tags: [
-          { name: 'Action', value: 'Balances' }
-        ],
-      });
+      const result = await this.withTimeout(
+        dryrun({
+          process: processId,
+          data: '',
+          tags: [
+            { name: 'Action', value: 'Balances' }
+          ],
+        }),
+        this.config.timeout
+      );
 
       if (!result || !result.Messages || result.Messages.length === 0) {
         throw new Error('No response from AO process');
@@ -57,5 +63,14 @@ export class AOClient {
 
     const validChars = /^[a-zA-Z0-9_-]+$/;
     return validChars.test(processId);
+  }
+
+  private withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error(`dryrun timeout after ${timeoutMs}ms`)), timeoutMs)
+      )
+    ]);
   }
 }

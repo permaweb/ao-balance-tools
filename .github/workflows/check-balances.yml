@@ -37,7 +37,7 @@ jobs:
           cat >> $GITHUB_ENV << EOF
           CU_URL=https://cu.ao-testnet.xyz
           WALLET_PATH=wallet.json
-          HYPERBEAM_BASE_URL=${{ secrets.HYPERBEAM_BASE_URL || 'https://compute.hyperbeam.xyz' }}
+          HYPERBEAM_BASE_URL=https://state-1.forward.computer
           CONCURRENCY=${{ vars.CONCURRENCY || '15' }}
           RETRY_ATTEMPTS=${{ vars.RETRY_ATTEMPTS || '3' }}
           EOF

@@ -10,27 +10,27 @@ on:
 jobs:
   check-balances:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm install
-      
+
       - name: Build project
         run: npm run build
-      
+
       # Create wallet file from base64-encoded secret
       - name: Create wallet file
         run: echo '${{ secrets.WALLET_JSON }}' | base64 -d > wallet.json
-      
+
       # Set up environment variables
       - name: Set environment variables
         run: |
@@ -41,30 +41,30 @@ jobs:
           CONCURRENCY=${{ vars.CONCURRENCY || '15' }}
           RETRY_ATTEMPTS=${{ vars.RETRY_ATTEMPTS || '3' }}
           EOF
-      
+
       # Read processes from processes.txt and check each one
       - name: Check process balances
         run: |
           # Create a temporary file to store results summary
           > check_results.txt
-          
+
           # Read processes.txt and process each line
           while IFS= read -r line || [[ -n "$line" ]]; do
             # Skip empty lines and comments
             [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-            
+
             # Trim whitespace
             process_id=$(echo "$line" | xargs)
-            
+
             # Skip if empty after trimming
             [[ -z "$process_id" ]] && continue
-            
+
             echo "Checking balance for process: $process_id"
-            
+
             # Generate safe filename from process ID
             safe_name=$(echo "$process_id" | cut -c1-8)
             report_file="balance-report-${safe_name}.json"
-            
+
             # Run the balance checker
             if node dist/cli.js \
               --mode wallet \
@@ -77,12 +77,12 @@ jobs:
               echo "✗ $process_id: FAILED" >> check_results.txt
             fi
           done < processes.txt
-          
+
           echo ""
           echo "=== Check Results ==="
           cat check_results.txt || echo "No processes checked"
         continue-on-error: true
-      
+
       # Upload reports as artifacts
       - name: Upload balance reports
         if: always()
@@ -91,49 +91,49 @@ jobs:
           name: balance-reports-${{ github.run_number }}
           path: balance-report-*.json
           retention-days: 30
-       
-       # Create a summary report with balance details
-       - name: Create summary
-         if: always()
-         run: |
-           echo "## Balance Check Report" >> $GITHUB_STEP_SUMMARY
-           echo "" >> $GITHUB_STEP_SUMMARY
-           echo "### Execution Status" >> $GITHUB_STEP_SUMMARY
-           
-           if [ -f check_results.txt ]; then
-             cat check_results.txt >> $GITHUB_STEP_SUMMARY
-           else
-             echo "No processes in processes.txt" >> $GITHUB_STEP_SUMMARY
-           fi
-           
-           echo "" >> $GITHUB_STEP_SUMMARY
-           echo "### Balance Details" >> $GITHUB_STEP_SUMMARY
-           echo "" >> $GITHUB_STEP_SUMMARY
-           
-           # Parse JSON reports and extract summary data
-           for report_file in balance-report-*.json; do
-             if [ -f "$report_file" ]; then
-               # Extract key metrics from JSON
-               total_addresses=$(jq -r '.summary.total_addresses // .data.total_addresses // "N/A"' "$report_file" 2>/dev/null)
-               matching=$(jq -r '.summary.matching // .data.matching // "N/A"' "$report_file" 2>/dev/null)
-               mismatching=$(jq -r '.summary.mismatching // .data.mismatching // "N/A"' "$report_file" 2>/dev/null)
-               accuracy=$(jq -r '.summary.accuracy // .data.accuracy // "N/A"' "$report_file" 2>/dev/null)
-               
-               # Extract process ID from filename
-               process_id=$(basename "$report_file" .json | sed 's/balance-report-//')
-               
-               echo "**Process: $process_id**" >> $GITHUB_STEP_SUMMARY
-               echo "- Total Addresses: $total_addresses" >> $GITHUB_STEP_SUMMARY
-               echo "- Matching: $matching" >> $GITHUB_STEP_SUMMARY
-               echo "- Mismatching: $mismatching" >> $GITHUB_STEP_SUMMARY
-               echo "- Accuracy: $accuracy%" >> $GITHUB_STEP_SUMMARY
-               echo "" >> $GITHUB_STEP_SUMMARY
-             fi
-           done
-           
-           echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
-           echo "[Download reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
-      
+
+      # Create a summary report with balance details
+      - name: Create summary
+        if: always()
+        run: |
+          echo "## Balance Check Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Execution Status" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f check_results.txt ]; then
+            cat check_results.txt >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No processes in processes.txt" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Balance Details" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Parse JSON reports and extract summary data
+          for report_file in balance-report-*.json; do
+            if [ -f "$report_file" ]; then
+              # Extract key metrics from JSON
+              total_addresses=$(jq -r '.summary.total_addresses // .data.total_addresses // "N/A"' "$report_file" 2>/dev/null)
+              matching=$(jq -r '.summary.matching // .data.matching // "N/A"' "$report_file" 2>/dev/null)
+              mismatching=$(jq -r '.summary.mismatching // .data.mismatching // "N/A"' "$report_file" 2>/dev/null)
+              accuracy=$(jq -r '.summary.accuracy // .data.accuracy // "N/A"' "$report_file" 2>/dev/null)
+
+              # Extract process ID from filename
+              process_id=$(basename "$report_file" .json | sed 's/balance-report-//')
+
+              echo "**Process: $process_id**" >> $GITHUB_STEP_SUMMARY
+              echo "- Total Addresses: $total_addresses" >> $GITHUB_STEP_SUMMARY
+              echo "- Matching: $matching" >> $GITHUB_STEP_SUMMARY
+              echo "- Mismatching: $mismatching" >> $GITHUB_STEP_SUMMARY
+              echo "- Accuracy: $accuracy%" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "[Download reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+
       # Clean up wallet file
       - name: Clean up wallet file
         if: always()

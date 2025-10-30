@@ -16,10 +16,11 @@ program
   .description('CLI tool to validate AO process balances against Hyperbeam API')
   .version('1.0.0')
   .argument('<process-id>', 'AO process ID to check balances for')
-  .option('-m, --mode <type>', 'Balance fetch mode: dryrun, wallet, or manual', 'dryrun')
-  .option('-w, --wallet <path>', 'Path to wallet file (required for wallet mode)')
-  .option('--message-id <id>', 'Message ID to fetch balances from (required for manual mode)')
-  .option('--hyperbeam <url>', 'Custom Hyperbeam endpoint URL (default: from env or https://compute.hyperbeam.xyz)')
+   .option('-m, --mode <type>', 'Balance fetch mode: dryrun, wallet, or manual', 'dryrun')
+   .option('-w, --wallet <path>', 'Path to wallet file (required for wallet mode)')
+   .option('--message-id <id>', 'Message ID to fetch balances from (required for manual mode)')
+   .option('--balances-file <path>', 'Path to JSON file with balances (alternative to message-id for manual mode)')
+   .option('--hyperbeam <url>', 'Custom Hyperbeam endpoint URL (default: from env or https://compute.hyperbeam.xyz)')
   .option('-o, --output <format>', 'Output format: console, json, or csv', 'console')
   .option('-f, --file <path>', 'Output file path (for json/csv formats)')
   .option('-c, --concurrency <number>', 'Number of concurrent requests', '15')
@@ -71,9 +72,9 @@ program
         validateWalletPath(options.wallet);
       }
 
-      if (mode === 'manual' && !options.messageId) {
+      if (mode === 'manual' && !options.messageId && !options.balancesFile) {
         reporter.printError(
-          new Error('--message-id option required for manual mode')
+          new Error('--message-id or --balances-file option required for manual mode')
         );
         process.exit(1);
       }
@@ -109,11 +110,19 @@ program
       
       if (mode === 'manual') {
         const processor = new ManualModeProcessor(config);
-        comparisons = await processor.validateAndProcess(
-          processId,
-          options.messageId,
-          options.progress
-        );
+        if (options.balancesFile) {
+          comparisons = await processor.validateAndProcessFromFile(
+            processId,
+            options.balancesFile,
+            options.progress
+          );
+        } else {
+          comparisons = await processor.validateAndProcess(
+            processId,
+            options.messageId,
+            options.progress
+          );
+        }
       } else if (mode === 'wallet') {
         const processor = new WalletBalanceProcessor(config, options.wallet);
         comparisons = await processor.validateAndProcess(

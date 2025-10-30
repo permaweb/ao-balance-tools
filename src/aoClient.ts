@@ -1,12 +1,17 @@
-import { dryrun } from '@permaweb/aoconnect';
+import { connect } from '@permaweb/aoconnect';
 import { Config, AOBalanceResponse } from './types';
 
 export class AOClient {
-  constructor(_config: Config) {
+  private cuUrl: string;
+
+  constructor(config: Config) {
+    this.cuUrl = config.cuUrl;
   }
 
   async getBalances(processId: string): Promise<AOBalanceResponse> {
     try {
+      const { dryrun } = connect({ CU_URL: this.cuUrl });
+      
       const result = await dryrun({
         process: processId,
         data: '',
